@@ -7,7 +7,7 @@ import "../accesscontrol/RetailerRole.sol";
 import "../accesscontrol/ConsumerRole.sol";
 import "../base/Ownable.sol";
 
-contract SupplyChain is Ownable, FarmerRole, DistributorRole, ConsumerRole {
+contract SupplyChain is Ownable, FarmerRole, DistributorRole, RetailerRole, ConsumerRole {
   uint  upc;
   uint  sku;
 

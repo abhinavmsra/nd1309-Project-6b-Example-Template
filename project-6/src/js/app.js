@@ -47,102 +47,77 @@ App = {
         App.distributorID = $("#distributorID").val();
         App.retailerID = $("#retailerID").val();
         App.consumerID = $("#consumerID").val();
-
-        console.log(
-            App.sku,
-            App.upc,
-            App.ownerID, 
-            App.originFarmerID, 
-            App.originFarmName, 
-            App.originFarmInformation, 
-            App.originFarmLatitude, 
-            App.originFarmLongitude, 
-            App.productNotes, 
-            App.productPrice, 
-            App.distributorID, 
-            App.retailerID, 
-            App.consumerID
-        );
     },
 
     initWeb3: async function () {
         if (window.ethereum) {
-            App.web3Provider = Web3.givenProvider;
+            App.web3 = new Web3(Web3.givenProvider);  
             await window.ethereum.enable(); // get permission to access accounts
         } else {
             console.warn('No web3 detected. Falling back to http://127.0.0.1:7545. You should remove this fallback when you deploy live');
-            this.web3 = new Web3(new Web3.providers.HttpProvider('http://127.0.0.1:7545'));
+            App.web3 = new Web3(new Web3.providers.HttpProvider('http://127.0.0.1:7545'));
         }
 
         await App.getMetaskAccountID();
-
-        return App.initSupplyChain();
+        await App.initSupplyChain();
+        await App.initRole();
     },
 
     getMetaskAccountID: async function () {
-        App.web3 = new Web3(App.web3Provider);  
         App.networkID = await App.web3.eth.net.getId();
         App.metamaskAccountID = (await App.web3.eth.getAccounts())[0];
-        App.initRole();
     },
 
     initRole: async function () {
-        const jsonFarmer = await $.getJSON('../../build/contracts/FarmerRole.json');
-        let { abi, networks } = jsonFarmer;
-        let deployedNetwork = networks[App.networkID];
-        App.contracts.Role = new App.web3.eth.Contract(abi, deployedNetwork.address);
-        let result = await App.contracts.Role.methods.isFarmer(App.metamaskAccountID).call();
+        App.initAsFarmer();
+        if(App.role) { return; }
+
+        App.initAsDistributor();
+        if(App.role) { return; }
+
+        App.initAsRetailer();
+        if(App.role) { return; }
+
+        App.initAsConsumer();
+        if(App.role) { return; }
+    },
+
+    initAsFarmer: async function () {
+        const result = await App.contracts.SupplyChain.methods.isFarmer(App.metamaskAccountID).call();
         if (result === true) { 
             App.role = ROLES.farmer; 
-            document.querySelector("#originFarmerID").value = result.originFarmerID;
-            return; 
-        }
+        } 
+    },
 
-        const jsonDistributor = await $.getJSON('../../build/contracts/DistributorRole.json');
-        abi = jsonDistributor.abi;
-        networks = jsonDistributor.networks;
-        deployedNetwork = networks[App.networkID];
-        App.contracts.Role = new App.web3.eth.Contract(abi, deployedNetwork.address);
-        result = await App.contracts.Role.methods.isDistributor(App.metamaskAccountID).call();
+    initAsDistributor: async function () {
+        const result = await App.contracts.SupplyChain.methods.isDistributor(App.metamaskAccountID).call();
         if (result === true) { 
             App.role = ROLES.distributor; 
-            return; 
         }
+    },
 
-        const jsonRetailer = await $.getJSON('../../build/contracts/RetailerRole.json');
-        abi = jsonRetailer.abi;
-        networks = jsonRetailer.networks;
-        deployedNetwork = networks[App.networkID];
-        App.contracts.Role = new App.web3.eth.Contract(abi, deployedNetwork.address);
-        result = await App.contracts.Role.methods.isRetailer(App.metamaskAccountID).call();
+    initAsRetailer: async function () {
+        const result = await App.contracts.SupplyChain.methods.isRetailer(App.metamaskAccountID).call();
         if (result === true) { 
             App.role = ROLES.retailer; 
-            return; 
         }
+    },
 
-        const jsonConsumer = await $.getJSON('../../build/contracts/ConsumerRole.json');
-        abi = jsonConsumer.abi;
-        networks = jsonConsumer.networks;
-        deployedNetwork = networks[App.networkID];
-        App.contracts.Role = new App.web3.eth.Contract(abi, deployedNetwork.address);
-        result = await App.contracts.Role.methods.isConsumer(App.metamaskAccountID).call();
+    initAsConsumer: async function () {
+        const result = await App.contracts.SupplyChain.methods.isConsumer(App.metamaskAccountID).call();
         if (result === true) { 
             App.role = ROLES.consumer; 
-            return; 
-        }
+        } 
     },
 
     initSupplyChain: async function () {
         const jsonSupplyChain = await $.getJSON('../../build/contracts/SupplyChain.json');
         const { abi, networks } = jsonSupplyChain;
         const deployedNetwork = networks[App.networkID];
-
+        
         App.contracts.SupplyChain = new App.web3.eth.Contract(abi, deployedNetwork.address);
 
-        App.fetchItemBufferOne();
-        App.fetchItemBufferTwo();
         App.fetchEvents();
-
         return App.bindEvents();
     },
 
@@ -254,7 +229,7 @@ App = {
 
         const result = await sellItem(
             document.querySelector("#upc").value,
-            App.web3.utils.toWei(document.querySelector("#salePrice").value)
+            App.web3.utils.toWei(document.querySelector("#productPrice").value)
         ).send({from: App.metamaskAccountID});
         console.log('sellItem',result);
         App.fetchItemBufferOne();
