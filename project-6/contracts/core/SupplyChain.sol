@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.6;
 
-contract SupplyChain {
-  address owner;
+import "../accesscontrol/FarmerRole.sol";
+import "../accesscontrol/DistributorRole.sol";
+import "../accesscontrol/RetailerRole.sol";
+import "../accesscontrol/ConsumerRole.sol";
+import "../base/Ownable.sol";
+
+contract SupplyChain is Ownable, FarmerRole, DistributorRole, ConsumerRole {
   uint  upc;
   uint  sku;
 
@@ -55,12 +60,6 @@ contract SupplyChain {
   event Shipped(uint upc);
   event Received(uint upc);
   event Purchased(uint upc);
-
-  // Define a modifer that checks to see if msg.sender == owner of the contract
-  modifier onlyOwner() {
-    require(msg.sender == owner);
-    _;
-  }
 
   // Define a modifer that verifies the Caller
   modifier verifyCaller (address _address) {
@@ -132,14 +131,13 @@ contract SupplyChain {
   }
 
   constructor() {
-    owner = msg.sender;
     sku = 1;
     upc = 1;
   }
 
   // Define a function 'kill' if required
   function kill() public onlyOwner {
-    selfdestruct(payable(owner));
+    selfdestruct(payable(owner()));
   }
 
   // Define a function 'harvestItem' that allows a farmer to mark an item 'Harvested'
